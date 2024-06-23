@@ -1,0 +1,78 @@
+import { Button } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    in-out property <string> time: "<time>";
+    in-out property <string> ntp-server: "ntp.aliyun.com";
+    in-out property <bool> check-button-enabled: true;
+    in-out property <string> check-result: "测试结果:";
+    callback check-ntp-server();
+
+    width: 380px;
+    height: 180px;
+    title: "NTP测试工具";
+    icon: @image-url("../resources/logo.png");
+    //icon: @image-url("logo.ico");
+
+    VerticalLayout {
+        x: 10px;
+        y: 8px;
+        alignment: start;
+        spacing: 8px;
+        HorizontalLayout {
+            alignment: start;
+            Text {
+                font-size: 14px;
+                text: "本地时间: \{root.time}";
+            }
+        }
+
+        HorizontalLayout {
+            alignment: start;
+            Text {
+                y: 4px;
+                padding-top: 4px;
+                font-size: 14px;
+                text: "NTP服务器地址: ";
+            }
+
+            Rectangle {
+                width: 150px;
+                height: 24px;
+                border-color: gray;
+                border-width: 1px;
+                TextInput {
+                    x: 2px;
+                    vertical-alignment: center;
+                    font-size: 14px;
+                    text: root.ntp-server;
+                    edited => {
+                        root.ntp-server = self.text;
+                    }
+                }
+            }
+
+            Text {
+                font-size: 14px;
+                text: " ";
+            }
+
+            Button {
+                height: 24px;
+                padding-top: -8px;
+                text: "测试";
+                enabled: root.check-button-enabled;
+                clicked => {
+                    root.check-ntp-server();
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: start;
+            Text {
+                font-size: 14px;
+                text: "\{root.check-result}";
+            }
+        }
+    }
+}

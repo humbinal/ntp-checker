@@ -1,0 +1,20 @@
+[package]
+name = "ntp-checker"
+version = "0.1.0"
+authors = ["humbinal <humbinal@126.com>"]
+edition = "2021"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.release]
+lto = true
+
+[dependencies]
+slint = "1.6"
+chrono = "0.4.38"
+rsntp = "4.0.0"
+
+[build-dependencies]
+slint-build = "1.6"
+winresource = "0.1.17"
