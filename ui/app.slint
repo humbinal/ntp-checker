@@ -1,21 +1,25 @@
 import { Button } from "std-widgets.slint";
+import "../resources/MiSans-Regular.otf";
 
 export component AppWindow inherits Window {
+
+    default-font-family: "MiSans Regular";
+
     in-out property <string> time: "<time>";
     in-out property <string> ntp-server: "ntp.aliyun.com";
     in-out property <bool> check-button-enabled: true;
-    in-out property <string> check-result: "测试结果:";
+    in-out property <bool> check-succeed: false;
+    in-out property <string> check-result: "";
     callback check-ntp-server();
 
-    width: 380px;
-    height: 180px;
+    min-width: 380px;
+    min-height: 180px;
     title: "NTP测试工具";
     icon: @image-url("../resources/logo.png");
-    //icon: @image-url("logo.ico");
+    background: #fafafa;
 
     VerticalLayout {
-        x: 10px;
-        y: 8px;
+        padding: 12px;
         alignment: start;
         spacing: 8px;
         HorizontalLayout {
@@ -57,9 +61,10 @@ export component AppWindow inherits Window {
             }
 
             Button {
+                text: "测试";
                 height: 24px;
                 padding-top: -8px;
-                text: "测试";
+                // primary: true;
                 enabled: root.check-button-enabled;
                 clicked => {
                     root.check-ntp-server();
@@ -70,8 +75,10 @@ export component AppWindow inherits Window {
         HorizontalLayout {
             alignment: start;
             Text {
-                font-size: 14px;
+                color: root.check-succeed ? blue : red;
                 text: "\{root.check-result}";
+                font-size: 14px;
+                wrap: word-wrap;
             }
         }
     }
