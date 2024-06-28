@@ -28,7 +28,7 @@ fn main() -> Result<(), slint::PlatformError> {
             let ui = ui_handle.unwrap();
             ui.set_check_button_enabled(false);
             let ntp_server = ui.get_ntp_server();
-            ui.set_check_result(SharedString::from(format!("服务器{}连接中...", ntp_server)));
+            ui.set_check_result(SharedString::from(format!("connecting to server {} ...", ntp_server)));
             let ui_handle = ui.as_weak();
             thread::spawn(move || {
                 let mut client = SntpClient::new();
@@ -39,10 +39,10 @@ fn main() -> Result<(), slint::PlatformError> {
                         let local_time: DateTime<Local> =
                             DateTime::from(result.datetime().into_chrono_datetime().unwrap());
                         let res_time = local_time.format("%Y-%m-%d %H:%M:%S").to_string();
-                        (format!("服务器{}连接成功!\n返回时间为: {}", ntp_server, res_time), true)
+                        (format!("connect to server {} succeed!\ngot time: {}", ntp_server, res_time), true)
                     }
                     Err(error) => {
-                        (format!("服务器{}连接失败!\n{}", ntp_server, error), false)
+                        (format!("connect to server {} failed!\n{}", ntp_server, error), false)
                     }
                 };
 
