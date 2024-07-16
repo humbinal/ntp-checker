@@ -9,7 +9,7 @@ export component AppWindow inherits Window {
     in-out property <string> check-result: "";
     callback check-ntp-server();
 
-    //default-font-family: "Noto Sans SC";
+    default-font-family: "Noto Sans SC";
 
     min-width: 380px;
     min-height: 180px;
@@ -24,7 +24,7 @@ export component AppWindow inherits Window {
         HorizontalLayout {
             alignment: start;
             Text {
-                font-size: 14px;
+                font-size: 15px;
                 text: "local time: \{root.time}";
             }
         }
@@ -34,7 +34,7 @@ export component AppWindow inherits Window {
             Text {
                 y: 4px;
                 padding-top: 4px;
-                font-size: 14px;
+                font-size: 15px;
                 text: "ntp server address: ";
             }
 
@@ -46,7 +46,7 @@ export component AppWindow inherits Window {
                 TextInput {
                     x: 2px;
                     vertical-alignment: center;
-                    font-size: 14px;
+                    font-size: 15px;
                     text: root.ntp-server;
                     edited => {
                         root.ntp-server = self.text;
@@ -58,12 +58,16 @@ export component AppWindow inherits Window {
                 font-size: 14px;
                 text: " ";
             }
+        }
 
+        HorizontalLayout {
+            alignment: start;
             Button {
                 text: "check";
-                height: 24px;
-                padding-top: -8px;
-                // primary: true;
+                // height: 28px;
+                // width: 100px;
+                // padding-top: -8px;
+                primary: true;
                 enabled: root.check-button-enabled;
                 clicked => {
                     root.check-ntp-server();
