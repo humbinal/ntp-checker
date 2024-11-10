@@ -6,5 +6,6 @@ Currently, only Windows is supported, Linux and macOS will be supported in the f
 
 ## develop
 
-- lang: rust
-- ui framework: slint
+- ui framework: tauri
+- backend: rust
+- frontend: vue
