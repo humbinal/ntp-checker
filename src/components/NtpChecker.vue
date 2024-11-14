@@ -30,7 +30,7 @@ import {invoke} from "@tauri-apps/api/core";
 
 // const message = useMessage();
 
-const ntpServerAddress = ref("ntp.aliyun.com");
+const ntpServerAddress = ref("127.0.0.1");
 const checkResult = reactive({
   success: true,
   value: "",
