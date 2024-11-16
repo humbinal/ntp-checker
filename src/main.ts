@@ -1,5 +1,5 @@
 import {createApp} from "vue";
-import 'virtual:uno.css'
+import 'virtual:uno.css';
 import "@/style/index.css";
 import App from "./App.vue";
 

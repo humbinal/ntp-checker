@@ -5,7 +5,7 @@ import UnoCSS from 'unocss/vite'
 import presetUno from '@unocss/preset-uno';
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
-import {NaiveUiResolver} from 'unplugin-vue-components/resolvers'
+import {ElementPlusResolver} from 'unplugin-vue-components/resolvers'
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -17,20 +17,10 @@ export default defineConfig(async () => ({
             presets: [presetUno()],
         }),
         AutoImport({
-            imports: [
-                'vue',
-                {
-                    'naive-ui': [
-                        'useDialog',
-                        'useMessage',
-                        'useNotification',
-                        'useLoadingBar'
-                    ]
-                }
-            ]
+            resolvers: [ElementPlusResolver()],
         }),
         Components({
-            resolvers: [NaiveUiResolver()]
+            resolvers: [ElementPlusResolver()],
         }),
     ],
     resolve: {

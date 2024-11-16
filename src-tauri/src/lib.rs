@@ -9,7 +9,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub(crate) mod ntpserver;
 
-use crate::ntpserver::NtpServer;
+use crate::ntpserver::{NtpServer, NtpServerController};
 
 #[derive(Debug)]
 struct NtpPacket {
@@ -40,21 +40,6 @@ impl NtpPacket {
     }
 }
 
-
-struct NtpServerController {
-    handle: Option<JoinHandle<()>>,
-    stop_sender: Option<Sender<()>>,
-}
-
-impl NtpServerController {
-    fn new() -> Self {
-        Self {
-            handle: None,
-            stop_sender: None,
-        }
-    }
-}
-
 #[tauri::command]
 fn ntp_check(address: &str) -> Result<String, String> {
     let mut client = SntpClient::new();
@@ -73,7 +58,6 @@ fn ntp_check(address: &str) -> Result<String, String> {
         Err(error) => Err(format!("connect to server {} failed!\n{}", address, error)),
     }
 }
-
 
 #[tauri::command]
 fn start_ntp_server2(state: tauri::State<Arc<Mutex<NtpServerController>>>) -> Result<(), String> {
@@ -138,9 +122,7 @@ fn start_ntp_server(state: tauri::State<Arc<Mutex<NtpServerController>>>) -> Res
     let handle = thread::spawn(move || {
         println!("NTP 服务器线程已启动");
         println!("NTP Server running on {}", "0.0.0.0:123");
-        let addrs = vec!["0.0.0.0:123".to_string(), "[::]:123".to_string()];
-        let server_addr = "127.0.0.1:11123".to_string();
-        let server = NtpServer::new(addrs, server_addr, true);
+        let server = NtpServer::new("0.0.0.0:123".to_string(), rx, true);
         server.run();
     });
 
@@ -169,7 +151,11 @@ pub fn run() {
     tauri::Builder::default()
         .manage(controller)
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![ntp_check,start_ntp_server,stop_ntp_server])
+        .invoke_handler(tauri::generate_handler![
+            ntp_check,
+            start_ntp_server,
+            stop_ntp_server
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

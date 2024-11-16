@@ -1,34 +1,16 @@
-// Copyright (C) 2017  Miroslav Lichvar
-//
-// This program is free software; you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 extern crate byteorder;
-extern crate getopts;
 extern crate net2;
 extern crate rand;
 
-use std::thread;
-use std::env;
+use byteorder::{BigEndian, ByteOrder};
 use std::io;
 use std::io::{Error, ErrorKind};
-use std::net::{UdpSocket, SocketAddr};
-use std::time::{SystemTime, Duration};
-use std::sync::{Arc, Mutex};
-
-use byteorder::{BigEndian, ByteOrder};
-
-use getopts::Options;
+use std::net::{SocketAddr, UdpSocket};
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
+use std::thread::JoinHandle;
+use std::time::{Duration, SystemTime};
 
 use net2::UdpBuilder;
 
@@ -46,7 +28,9 @@ impl NtpTimestamp {
         let secs = dur.as_secs() + 2208988800; // 1900 epoch
         let nanos = dur.subsec_nanos();
 
-        NtpTimestamp { ts: (secs << 32) + (nanos as f64 * 4.294967296) as u64 }
+        NtpTimestamp {
+            ts: (secs << 32) + (nanos as f64 * 4.294967296) as u64,
+        }
     }
 
     fn zero() -> NtpTimestamp {
@@ -62,7 +46,9 @@ impl NtpTimestamp {
     }
 
     fn read(buf: &[u8]) -> NtpTimestamp {
-        NtpTimestamp { ts: BigEndian::read_u64(buf) }
+        NtpTimestamp {
+            ts: BigEndian::read_u64(buf),
+        }
     }
 
     fn write(&self, buf: &mut [u8]) {
@@ -83,7 +69,9 @@ struct NtpFracValue {
 
 impl NtpFracValue {
     fn read(buf: &[u8]) -> NtpFracValue {
-        NtpFracValue { val: BigEndian::read_u32(buf) }
+        NtpFracValue {
+            val: BigEndian::read_u32(buf),
+        }
     }
 
     fn write(&self, buf: &mut [u8]) {
@@ -123,39 +111,46 @@ impl NtpPacket {
     fn receive(socket: &UdpSocket) -> io::Result<NtpPacket> {
         let mut buf = [0; 1024];
 
-        let (len, addr) = socket.recv_from(&mut buf)?;
+        // let (len, addr) = socket.recv_from(&mut buf);
+        match socket.recv_from(&mut buf) {
+            Ok((len, addr)) => {
+                let local_ts = NtpTimestamp::now();
 
-        let local_ts = NtpTimestamp::now();
+                if len < 48 {
+                    return Err(Error::new(ErrorKind::UnexpectedEof, "Packet too short"));
+                }
 
-        if len < 48 {
-            return Err(Error::new(ErrorKind::UnexpectedEof, "Packet too short"));
+                let leap = buf[0] >> 6;
+                let version = (buf[0] >> 3) & 0x7;
+                let mode = buf[0] & 0x7;
+
+                if version < 1 || version > 4 {
+                    return Err(Error::new(ErrorKind::Other, "Unsupported version"));
+                }
+
+                Ok(NtpPacket {
+                    remote_addr: addr,
+                    local_ts: local_ts,
+                    leap: leap,
+                    version: version,
+                    mode: mode,
+                    stratum: buf[1],
+                    poll: buf[2] as i8,
+                    precision: buf[3] as i8,
+                    delay: NtpFracValue::read(&buf[4..8]),
+                    dispersion: NtpFracValue::read(&buf[8..12]),
+                    ref_id: BigEndian::read_u32(&buf[12..16]),
+                    ref_ts: NtpTimestamp::read(&buf[16..24]),
+                    orig_ts: NtpTimestamp::read(&buf[24..32]),
+                    rx_ts: NtpTimestamp::read(&buf[32..40]),
+                    tx_ts: NtpTimestamp::read(&buf[40..48]),
+                })
+            }
+            Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                Err(Error::new(ErrorKind::WouldBlock, "Would Block"))
+            }
+            Err(e) => Err(Error::new(ErrorKind::Other, e)),
         }
-
-        let leap = buf[0] >> 6;
-        let version = (buf[0] >> 3) & 0x7;
-        let mode = buf[0] & 0x7;
-
-        if version < 1 || version > 4 {
-            return Err(Error::new(ErrorKind::Other, "Unsupported version"));
-        }
-
-        Ok(NtpPacket {
-            remote_addr: addr,
-            local_ts: local_ts,
-            leap: leap,
-            version: version,
-            mode: mode,
-            stratum: buf[1],
-            poll: buf[2] as i8,
-            precision: buf[3] as i8,
-            delay: NtpFracValue::read(&buf[4..8]),
-            dispersion: NtpFracValue::read(&buf[8..12]),
-            ref_id: BigEndian::read_u32(&buf[12..16]),
-            ref_ts: NtpTimestamp::read(&buf[16..24]),
-            orig_ts: NtpTimestamp::read(&buf[24..32]),
-            rx_ts: NtpTimestamp::read(&buf[32..40]),
-            tx_ts: NtpTimestamp::read(&buf[40..48]),
-        })
     }
 
     fn send(&self, socket: &UdpSocket) -> io::Result<usize> {
@@ -177,8 +172,9 @@ impl NtpPacket {
     }
 
     fn is_request(&self) -> bool {
-        self.mode == 1 || self.mode == 3 ||
-            (self.mode == 0 && self.version == 1 && self.remote_addr.port() != 123)
+        self.mode == 1
+            || self.mode == 3
+            || (self.mode == 0 && self.version == 1 && self.remote_addr.port() != 123)
     }
 
     fn make_response(&self, state: &NtpServerState) -> Option<NtpPacket> {
@@ -207,7 +203,7 @@ impl NtpPacket {
 
     fn new_request(remote_addr: SocketAddr) -> NtpPacket {
         NtpPacket {
-            remote_addr: remote_addr,
+            remote_addr,
             local_ts: NtpTimestamp::now(),
             leap: 0,
             version: 4,
@@ -226,9 +222,9 @@ impl NtpPacket {
     }
 
     fn is_valid_response(&self, request: &NtpPacket) -> bool {
-        self.remote_addr == request.remote_addr &&
-            self.mode == request.mode + 1 &&
-            self.orig_ts == request.tx_ts
+        self.remote_addr == request.remote_addr
+            && self.mode == request.mode + 1
+            && self.orig_ts == request.tx_ts
     }
 
     fn get_server_state(&self) -> NtpServerState {
@@ -258,54 +254,18 @@ struct NtpServerState {
 pub struct NtpServer {
     state: Arc<Mutex<NtpServerState>>,
     sockets: Vec<UdpSocket>,
-    server_addr: String,
+    rx: Receiver<()>,
     debug: bool,
 }
 
 impl NtpServer {
-    pub fn new(local_addrs: Vec<String>, server_addr: String, debug: bool) -> NtpServer {
-        let state = NtpServerState {
-            leap: 0,
-            stratum: 1,
-            precision: 0,
-            ref_id: 0,
-            ref_ts: NtpTimestamp::zero(),
-            dispersion: NtpFracValue::zero(),
-            delay: NtpFracValue::zero(),
-        };
-
-        let mut sockets = vec![];
-
-        for addr in local_addrs {
-            let sockaddr = addr.parse().unwrap();
-
-            let udp_builder = match sockaddr {
-                SocketAddr::V4(_) => UdpBuilder::new_v4().unwrap(),
-                SocketAddr::V6(_) => UdpBuilder::new_v6().unwrap(),
-            };
-
-            let udp_builder_ref = match sockaddr {
-                SocketAddr::V4(_) => &udp_builder,
-                SocketAddr::V6(_) => udp_builder.only_v6(true).unwrap(),
-            };
-
-            let socket = match udp_builder_ref.reuse_address(true).unwrap().bind(sockaddr) {
-                Ok(s) => s,
-                Err(e) => panic!("Couldn't bind socket: {}", e)
-            };
-
-            sockets.push(socket);
-        }
-
-        NtpServer {
-            state: Arc::new(Mutex::new(state)),
-            sockets: sockets,
-            server_addr: server_addr,
-            debug: debug,
-        }
-    }
-
-    fn process_requests(thread_id: u32, debug: bool, socket: UdpSocket, state: Arc<Mutex<NtpServerState>>) {
+    fn process_requests(
+        thread_id: u32,
+        debug: bool,
+        socket: UdpSocket,
+        state: Arc<Mutex<NtpServerState>>,
+        rx: Receiver<()>,
+    ) {
         let mut last_update = NtpTimestamp::now();
         let mut cached_state: NtpServerState;
         cached_state = *state.lock().unwrap();
@@ -313,6 +273,10 @@ impl NtpServer {
         println!("Server thread #{} started", thread_id);
 
         loop {
+            if rx.try_recv().is_ok() {
+                println!("process_requests线程接收到停止信号");
+                break;
+            }
             match NtpPacket::receive(&socket) {
                 Ok(request) => {
                     if debug {
@@ -328,19 +292,22 @@ impl NtpServer {
                     }
 
                     match request.make_response(&cached_state) {
-                        Some(response) => {
-                            match response.send(&socket) {
-                                Ok(_) => {
-                                    if debug {
-                                        println!("Thread #{} sent {:?}", thread_id, response);
-                                    }
+                        Some(response) => match response.send(&socket) {
+                            Ok(_) => {
+                                if debug {
+                                    println!("Thread #{} sent {:?}", thread_id, response);
                                 }
-                                Err(e) => println!("Thread #{} failed to send packet to {}: {}",
-                                                   thread_id, response.remote_addr, e)
                             }
-                        }
+                            Err(e) => println!(
+                                "Thread #{} failed to send packet to {}: {}",
+                                thread_id, response.remote_addr, e
+                            ),
+                        },
                         None => {}
                     }
+                }
+                Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(50));
                 }
                 Err(e) => {
                     println!("Thread #{} failed to receive packet: {}", thread_id, e);
@@ -349,48 +316,33 @@ impl NtpServer {
         }
     }
 
-    fn update_state(state: Arc<Mutex<NtpServerState>>, addr: SocketAddr, debug: bool) {
-        let request = NtpPacket::new_request(addr);
-        let mut new_state: Option<NtpServerState> = None;
-        let socket = match addr {
-            SocketAddr::V4(_) => UdpBuilder::new_v4().unwrap().bind("0.0.0.0:0").unwrap(),
-            SocketAddr::V6(_) => UdpBuilder::new_v6().unwrap().bind("[::]:0").unwrap(),
+    pub fn new(addr: String, rx: Receiver<()>, debug: bool) -> NtpServer {
+        let state = NtpServerState {
+            leap: 0,
+            stratum: 1,
+            precision: 0,
+            ref_id: 0,
+            ref_ts: NtpTimestamp::zero(),
+            dispersion: NtpFracValue::zero(),
+            delay: NtpFracValue::zero(),
         };
-
-        socket.set_read_timeout(Some(Duration::new(1, 0))).unwrap();
-
-        loop {
-            let response = match NtpPacket::receive(&socket) {
-                Ok(packet) => {
-                    if debug {
-                        println!("Client received {:?}", packet);
-                    }
-
-                    if !packet.is_valid_response(&request) {
-                        println!("Client received unexpected {:?}", packet);
-                        continue;
-                    }
-
-                    packet
-                }
-                Err(e) => {
-                    if debug {
-                        println!("Client failed to receive packet: {}", e);
-                    }
-                    break;
-                }
-            };
-
-            new_state = Some(response.get_server_state());
-            break;
-        }
-
-        if let Ok(mut state) = state.lock() {
-            if let Some(new_state) = new_state {
-                *state = new_state;
+        let mut sockets = vec![];
+        let socket = match UdpSocket::bind(addr) {
+            Ok(socket) => {
+                socket.set_nonblocking(true).unwrap();
+                socket
             }
+            Err(e) => {
+                panic!("Couldn't bind socket: {}", e)
+            }
+        };
+        sockets.push(socket);
 
-            state.dispersion.increment();
+        NtpServer {
+            state: Arc::new(Mutex::new(state)),
+            sockets,
+            rx,
+            debug,
         }
     }
 
@@ -399,16 +351,28 @@ impl NtpServer {
         let mut id = 0;
         let quit = false;
 
+        let mut txs: Vec<Sender<()>> = vec![];
         for socket in &self.sockets {
             id = id + 1;
             let state = self.state.clone();
             let debug = self.debug;
             let cloned_socket = socket.try_clone().unwrap();
-
-            threads.push(thread::spawn(move || { NtpServer::process_requests(id, debug, cloned_socket, state); }));
+            let (tx, rx) = mpsc::channel();
+            threads.push(thread::spawn(move || {
+                NtpServer::process_requests(id, debug, cloned_socket, state, rx);
+            }));
+            txs.push(tx);
         }
 
         while !quit {
+            if self.rx.try_recv().is_ok() {
+                println!("rx received stop signal.");
+                for tx in txs {
+                    tx.send(()).unwrap();
+                    println!("sent stop signal to tx: #{:?}", tx);
+                }
+                break;
+            }
             thread::sleep(Duration::new(1, 0));
         }
 
@@ -418,15 +382,23 @@ impl NtpServer {
     }
 }
 
-fn print_usage(opts: Options) {
-    let brief = format!("Usage: rsntp [OPTIONS]");
-    print!("{}", opts.usage(&brief));
+pub struct NtpServerController {
+    pub handle: Option<JoinHandle<()>>,
+    pub stop_sender: Option<Sender<()>>,
+}
+
+impl NtpServerController {
+    pub fn new() -> Self {
+        Self {
+            handle: None,
+            stop_sender: None,
+        }
+    }
 }
 
 fn main() {
-    let addrs = vec!["0.0.0.0:123".to_string(), "[::]:123".to_string()];
-    let server_addr = "127.0.0.1:11123".to_string();
-    let server = NtpServer::new(addrs, server_addr, true);
+    let (tx, rx) = mpsc::channel();
+    let server = NtpServer::new("0.0.0.0:123".to_string(), rx, true);
 
     server.run();
 }
