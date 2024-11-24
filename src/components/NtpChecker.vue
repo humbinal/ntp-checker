@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col">
     <div class="flex flex-row items-center">
-      <span class="block text-lg font-600">NTP服务器地址:</span>
+      <span class="block text font-600">NTP服务器地址:</span>
       <el-input class="ml-1"
                style="width: 200px;"
                type="text"

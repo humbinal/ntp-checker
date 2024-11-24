@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
-  "version": "0.1.0",
-  "identifier": "com.humbinal.ntp",
+  "productName": "ntp-toolbox",
+  "version": "0.2.0",
+  "identifier": "com.humbinal.ntp-toolbox",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "NTP工具箱",
-        "width": 800,
-        "height": 600
+        "width": 700,
+        "height": 380,
+        "center": true,
+        "decorations": false
       }
     ],
     "security": {

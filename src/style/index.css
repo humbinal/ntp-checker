@@ -1,4 +1,7 @@
 @import "reset.css";
+@import "element-plus/dist/index.css";
+@import "element-plus/theme-chalk/dark/css-vars.css";
+@import "element-plus/theme-chalk/el-message.css";
 
 html {
     height: 100%;
@@ -15,5 +18,10 @@ body {
 }
 
 :root {
-    --el-color-primary: green;
+    /*--el-color-primary: green;*/
+}
+
+html.dark {
+    /* 自定义深色背景颜色 */
+    --el-bg-color: #626aef;
 }
