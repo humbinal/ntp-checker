@@ -13,7 +13,7 @@
     "windows": [
       {
         "title": "NTP工具箱",
-        "width": 700,
+        "width": 580,
         "height": 380,
         "center": true,
         "decorations": false
@@ -33,6 +33,16 @@
       "icons/icon.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine"
+      },
+      "wix": {
+        "language": [
+          "zh-CN"
+        ]
+      }
+    }
   }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "ntp-tool"
-version = "0.1.0"
+version = "0.1.5"
 description = "ntp gui tool"
 authors = ["humbinal"]
 edition = "2021"

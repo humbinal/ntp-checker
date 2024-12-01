@@ -12,8 +12,6 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, SystemTime};
 
-use net2::UdpBuilder;
-
 use rand::random;
 
 #[derive(Debug, Copy, Clone)]
@@ -379,12 +377,14 @@ impl NtpServer {
         for thread in threads {
             let _ = thread.join();
         }
+        println!("Server thread #{} stopped", id);
     }
 }
 
 pub struct NtpServerController {
     pub handle: Option<JoinHandle<()>>,
     pub stop_sender: Option<Sender<()>>,
+    pub running: bool,
 }
 
 impl NtpServerController {
@@ -392,13 +392,18 @@ impl NtpServerController {
         Self {
             handle: None,
             stop_sender: None,
+            running: false,
         }
     }
-}
+    pub fn set_running(&mut self) {
+        self.running = true;
+    }
 
-fn main() {
-    let (tx, rx) = mpsc::channel();
-    let server = NtpServer::new("0.0.0.0:123".to_string(), rx, true);
+    pub fn set_finished(&mut self) {
+        self.running = false;
+    }
 
-    server.run();
+    pub fn is_running(&self) -> bool {
+        self.running
+    }
 }
